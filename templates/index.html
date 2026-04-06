@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PathWeaver - Sequence Pathfinding</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+    /* ========== RESET & VARIABLES ========== */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+        --bg-body: #08081a;
+        --bg-sidebar: #0b0b22;
+        --bg-card: #10103a;
+        --bg-card-hover: #161655;
+        --bg-input: #0a0a1f;
+        --border: #1a1a55;
+        --border-hover: #2d2d70;
+        --accent: #7c3aed;
+        --accent-hover: #6d28d9;
+        --accent-soft: rgba(124,58,237,0.12);
+        --green: #10b981;
+        --green-soft: rgba(16,185,129,0.12);
+        --cyan: #06b6d4;
+        --cyan-soft: rgba(6,182,212,0.12);
+        --orange: #f59e0b;
+        --orange-soft: rgba(245,158,11,0.12);
+        --red: #ef4444;
+        --red-soft: rgba(239,68,68,0.12);
+        --pink: #ec4899;
+        --text: #e2e8f0;
+        --text-2: #94a3b8;
+        --text-3: #64748b;
+        --font: 'Inter', system-ui, sans-serif;
+        --mono: 'JetBrains Mono', 'Consolas', monospace;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --sidebar-w: 230px;
+    }
+
+    html, body { height:100%; font-family:var(--font); background:var(--bg-body); color:var(--text); line-height:1.5; -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+    button { font-family:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+    input, select { font-family:inherit; }
+
+    /* ========== LAYOUT ========== */
+    .app { display:flex; height:100vh; overflow:hidden; }
+
+    /* ========== SIDEBAR ========== */
+    .sidebar {
+        width:var(--sidebar-w); min-width:var(--sidebar-w); background:var(--bg-sidebar);
+        border-right:1px solid var(--border); display:flex; flex-direction:column;
+        padding:24px 16px 16px; overflow-y:auto;
+    }
+    .brand { font-size:18px; font-weight:800; letter-spacing:-0.5px; color:var(--text); }
+    .brand-sub { font-size:11px; font-weight:600; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase; margin-top:2px; }
+    .sidebar-nav { margin-top:32px; display:flex; flex-direction:column; gap:4px; flex:1; }
+    .nav-item {
+        display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:var(--radius-sm);
+        font-size:14px; font-weight:500; color:var(--text-2); transition:all 0.15s;
+    }
+    .nav-item:hover { color:var(--text); background:rgba(124,58,237,0.06); }
+    .nav-item.active { color:#fff; background:var(--accent); }
+    .nav-item svg { width:18px; height:18px; flex-shrink:0; }
+    .sidebar-footer { margin-top:auto; padding-top:16px; display:flex; flex-direction:column; gap:8px; }
+    .btn-new {
+        display:flex; align-items:center; justify-content:center; gap:8px;
+        padding:12px; border-radius:var(--radius-sm); background:var(--accent);
+        color:#fff; font-size:14px; font-weight:600; transition:background 0.15s;
+    }
+    .btn-new:hover { background:var(--accent-hover); }
+    .sidebar-link { font-size:13px; color:var(--text-3); padding:6px 14px; display:flex; align-items:center; gap:8px; }
+    .sidebar-link:hover { color:var(--text-2); }
+    .sidebar-link svg { width:16px; height:16px; }
+
+    /* ========== MAIN ========== */
+    .main { flex:1; overflow-y:auto; padding:0; }
+    .topbar {
+        position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between;
+        padding:16px 32px; background:var(--bg-body); border-bottom:1px solid var(--border);
+    }
+    .topbar-brand { font-size:16px; font-weight:700; color:var(--accent); letter-spacing:-0.3px; }
+    .topbar-tabs { display:flex; gap:24px; }
+    .topbar-tab { font-size:13px; font-weight:500; color:var(--text-3); padding:4px 0; border-bottom:2px solid transparent; transition:all 0.15s; }
+    .topbar-tab:hover { color:var(--text-2); }
+    .topbar-tab.active { color:var(--accent); border-color:var(--accent); }
+    .content-area { padding:28px 32px 48px; max-width:1100px; }
+
+    /* ========== VIEWS ========== */
+    .view { display:none; }
+    .view.active { display:block; animation:fadeIn 0.25s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    .view-label { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:4px; }
+    .view-title { font-size:28px; font-weight:800; letter-spacing:-0.5px; margin-bottom:24px; }
+
+    /* ========== CARDS ========== */
+    .card {
+        background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+        padding:20px; transition:border-color 0.15s;
+    }
+    .card:hover { border-color:var(--border-hover); }
+    .card-title { font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-3); margin-bottom:8px; }
+    .card-value { font-size:32px; font-weight:800; letter-spacing:-1px; }
+    .card-desc { font-size:13px; color:var(--text-2); margin-top:4px; }
+
+    /* ========== STAT GRID ========== */
+    .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
+    .stat-card .card-value span { font-size:14px; font-weight:500; color:var(--text-2); margin-left:4px; }
+
+    /* ========== ACTION BUTTONS ========== */
+    .action-grid { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px; }
+    .action-btn {
+        display:flex; align-items:center; gap:10px; padding:14px 22px; border-radius:var(--radius-sm);
+        background:var(--bg-card); border:1px solid var(--border); font-size:14px; font-weight:600;
+        color:var(--text); transition:all 0.15s;
+    }
+    .action-btn:hover { border-color:var(--accent); background:var(--accent-soft); }
+    .action-btn svg { width:18px; height:18px; color:var(--accent); }
+
+    /* ========== MODE TOGGLE ========== */
+    .mode-toggle { display:flex; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:20px; width:fit-content; }
+    .mode-btn { padding:10px 24px; font-size:13px; font-weight:600; color:var(--text-3); transition:all 0.15s; }
+    .mode-btn.active { background:var(--accent); color:#fff; }
+    .mode-btn:hover:not(.active) { color:var(--text); background:rgba(255,255,255,0.04); }
+
+    /* ========== FORM ========== */
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+    .form-group { display:flex; flex-direction:column; gap:6px; }
+    .form-label { font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-3); }
+    .form-input {
+        padding:12px 16px; background:var(--bg-input); border:1px solid var(--border);
+        border-radius:var(--radius-sm); color:var(--text); font-size:15px; font-family:var(--mono);
+        font-weight:500; outline:none; transition:border-color 0.15s;
+    }
+    .form-input:focus { border-color:var(--accent); }
+    .form-input::placeholder { color:var(--text-3); }
+    .form-input.dna-input { text-transform:uppercase; letter-spacing:2px; }
+
+    /* ========== ALGO SELECTOR ========== */
+    .algo-row { display:flex; align-items:end; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+    .algo-selector { display:flex; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+    .algo-btn { padding:10px 18px; font-size:13px; font-weight:600; color:var(--text-3); transition:all 0.15s; }
+    .algo-btn.active { background:var(--accent); color:#fff; }
+    .algo-btn:hover:not(.active) { color:var(--text); background:rgba(255,255,255,0.04); }
+
+    .dna-options { display:flex; align-items:end; gap:16px; margin-bottom:20px; }
+    .seq-select {
+        padding:10px 14px; background:var(--bg-input); border:1px solid var(--border);
+        border-radius:var(--radius-sm); color:var(--text); font-size:14px; font-weight:500;
+        outline:none; cursor:pointer; -webkit-appearance:none;
+    }
+    .seq-select:focus { border-color:var(--accent); }
+    .seq-select option { background:var(--bg-card); color:var(--text); }
+
+    /* ========== PRIMARY BUTTON ========== */
+    .btn-primary {
+        padding:12px 32px; background:var(--accent); color:#fff; border-radius:var(--radius-sm);
+        font-size:14px; font-weight:700; letter-spacing:0.3px; transition:background 0.15s;
+        display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn-primary:hover { background:var(--accent-hover); }
+    .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-secondary {
+        padding:10px 24px; background:transparent; border:1px solid var(--border);
+        color:var(--text-2); border-radius:var(--radius-sm); font-size:13px; font-weight:600;
+        transition:all 0.15s; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn-secondary:hover { border-color:var(--accent); color:var(--text); background:var(--accent-soft); }
+
+    /* ========== RESULTS ========== */
+    .results-section { margin-top:32px; display:none; }
+    .results-section.show { display:block; animation:fadeIn 0.3s ease; }
+    .results-divider { height:1px; background:var(--border); margin-bottom:24px; }
+    .result-block { margin-bottom:28px; }
+    .result-algo { font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+    .result-algo .tag { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+    .tag-astar { background:var(--green-soft); color:var(--green); }
+    .tag-bfs { background:var(--cyan-soft); color:var(--cyan); }
+    .tag-dijkstra { background:var(--orange-soft); color:var(--orange); }
+
+    /* ========== PATH CHAIN ========== */
+    .path-chain { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; padding:16px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); }
+    .path-node {
+        padding:8px 14px; background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-sm); font-family:var(--mono); font-size:14px; font-weight:600;
+        white-space:nowrap; transition:border-color 0.15s;
+    }
+    .path-node.start { border-color:var(--accent); background:var(--accent-soft); }
+    .path-node.goal { border-color:var(--green); background:var(--green-soft); }
+    .path-node.mid { border-color:var(--border-hover); }
+    .path-arrow { color:var(--text-3); font-size:16px; font-weight:600; }
+    .no-path { color:var(--red); font-weight:600; padding:12px; }
+
+    /* DNA nucleotide colors */
+    .base-a { color:#06b6d4; }
+    .base-t { color:#ec4899; }
+    .base-g { color:#10b981; }
+    .base-c { color:#f59e0b; }
+
+    /* ========== RESULT STATS ========== */
+    .result-stats { display:flex; gap:12px; flex-wrap:wrap; }
+    .mini-stat {
+        padding:12px 18px; background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-sm); min-width:120px;
+    }
+    .mini-stat-label { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); margin-bottom:4px; }
+    .mini-stat-value { font-size:22px; font-weight:800; letter-spacing:-0.5px; }
+    .mini-stat-value span { font-size:12px; font-weight:500; color:var(--text-2); }
+
+    /* ========== VIZ GALLERY ========== */
+    .viz-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+    .viz-card {
+        background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+        overflow:hidden; cursor:pointer; transition:border-color 0.15s;
+    }
+    .viz-card:hover { border-color:var(--accent); }
+    .viz-card-img { width:100%; aspect-ratio:16/10; object-fit:cover; display:block; background:var(--bg-input); }
+    .viz-card-body { padding:14px 16px; }
+    .viz-card-title { font-size:13px; font-weight:700; margin-bottom:2px; }
+    .viz-card-desc { font-size:12px; color:var(--text-3); }
+    .viz-placeholder { width:100%; aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; background:var(--bg-input); color:var(--text-3); font-size:13px; }
+
+    /* ========== COMPARE ========== */
+    .pairs-list { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+    .pair-badge { padding:6px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:20px; font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text-2); }
+    .compare-img { width:100%; border-radius:var(--radius); border:1px solid var(--border); margin-top:20px; }
+    .compare-table { width:100%; border-collapse:collapse; margin-top:20px; }
+    .compare-table th, .compare-table td { padding:10px 14px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }
+    .compare-table th { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); }
+    .compare-table td { color:var(--text-2); font-family:var(--mono); font-size:12px; }
+    .compare-table tr:hover td { color:var(--text); background:rgba(255,255,255,0.02); }
+
+    /* ========== LIGHTBOX ========== */
+    .lightbox { display:none; position:fixed; inset:0; z-index:100; align-items:center; justify-content:center; }
+    .lightbox.open { display:flex; animation:fadeIn 0.2s ease; }
+    .lightbox-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.85); }
+    .lightbox-img { position:relative; max-width:92vw; max-height:90vh; border-radius:var(--radius); z-index:1; }
+    .lightbox-close { position:absolute; top:20px; right:24px; z-index:2; font-size:28px; color:var(--text-2); background:var(--bg-card); border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; }
+    .lightbox-close:hover { color:#fff; }
+
+    /* ========== TOAST ========== */
+    .toast-container { position:fixed; top:20px; right:20px; z-index:200; display:flex; flex-direction:column; gap:8px; }
+    .toast {
+        padding:12px 20px; border-radius:var(--radius-sm); font-size:13px; font-weight:500;
+        animation:slideIn 0.3s ease; min-width:280px; display:flex; align-items:center; gap:10px;
+    }
+    .toast-error { background:#1a0a0a; border:1px solid #4a1515; color:var(--red); }
+    .toast-success { background:#0a1a10; border:1px solid #154a1f; color:var(--green); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
+
+    /* ========== SPINNER ========== */
+    .spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    .loading-overlay { display:flex; align-items:center; justify-content:center; gap:10px; padding:40px; color:var(--text-2); font-size:14px; }
+
+    /* ========== UTILITY ========== */
+    .hidden { display:none !important; }
+    .mt-8 { margin-top:8px; }
+    .mt-16 { margin-top:16px; }
+    .mt-24 { margin-top:24px; }
+    .mb-16 { margin-bottom:16px; }
+    .gap-12 { gap:12px; }
+    .flex { display:flex; }
+    .items-center { align-items:center; }
+
+    /* ========== BOTTOM INFO PANEL ========== */
+    .info-panel {
+        background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+        padding:24px; margin-top:28px;
+    }
+    .info-panel-header { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+    .info-panel-icon { width:40px; height:40px; background:var(--accent-soft); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; }
+    .info-panel-icon svg { width:20px; height:20px; color:var(--accent); }
+    .info-panel-title { font-size:18px; font-weight:700; }
+    .info-panel-desc { font-size:14px; color:var(--text-2); margin-bottom:16px; }
+    .info-stats { display:flex; gap:24px; flex-wrap:wrap; }
+    .info-stat { padding:16px 20px; background:var(--bg-input); border-radius:var(--radius-sm); min-width:160px; }
+    .info-stat-label { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+    .info-stat-label.cyan { color:var(--cyan); }
+    .info-stat-label.orange { color:var(--orange); }
+    .info-stat-label.green { color:var(--green); }
+    .info-stat-value { font-size:26px; font-weight:800; }
+    .info-stat-value span { font-size:14px; font-weight:500; color:var(--text-2); }
+    .info-bar { height:3px; border-radius:2px; margin-top:8px; }
+    .info-bar.cyan { background:var(--cyan); }
+    .info-bar.orange { background:var(--orange); }
+    .info-bar.green { background:var(--green); }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- ========== SIDEBAR ========== -->
+    <aside class="sidebar">
+        <div>
+            <div class="brand">PathWeaver</div>
+            <div class="brand-sub">Sequence Analysis</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">
+                <svg viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="1" width="8" height="8" rx="2"/><rect x="11" y="1" width="8" height="8" rx="2" opacity=".5"/><rect x="1" y="11" width="8" height="8" rx="2" opacity=".5"/><rect x="11" y="11" width="8" height="8" rx="2" opacity=".5"/></svg>
+                Dashboard
+            </a>
+            <a class="nav-item" data-view="solver" onclick="switchView('solver')">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 2h6M8 2v5l-5 9h14l-5-9V2"/></svg>
+                Solver
+            </a>
+            <a class="nav-item" data-view="visualizations" onclick="switchView('visualizations')">
+                <svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="10" width="4" height="8" rx="1"/><rect x="8" y="4" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="11" rx="1"/></svg>
+                Visualizations
+            </a>
+            <a class="nav-item" data-view="compare" onclick="switchView('compare')">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 4v12m0-12L2 7m3-3l3 3M15 16V4m0 12l-3-3m3 3l3-3"/></svg>
+                Compare
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="btn-new" onclick="newAnalysis()">+ New Analysis</button>
+            <a class="sidebar-link" href="https://github.com/Titas-Ghosh/AI-Poster" target="_blank">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h14M3 10h14M3 14h10"/></svg>
+                Docs
+            </a>
+        </div>
+    </aside>
+
+    <!-- ========== MAIN ========== -->
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-brand">GenomicLoom</div>
+            <div class="topbar-tabs">
+                <a class="topbar-tab active" onclick="switchView('solver')">Pathways</a>
+                <a class="topbar-tab" onclick="switchView('visualizations')">Sequences</a>
+                <a class="topbar-tab" onclick="switchView('compare')">Analytics</a>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3)"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>
+                <div style="width:32px;height:32px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">T</div>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <!-- ===== DASHBOARD ===== -->
+            <section id="view-dashboard" class="view active">
+                <div class="view-label">Sequence Analysis</div>
+                <div class="view-title">Dashboard</div>
+
+                <div class="stat-grid">
+                    <div class="card stat-card">
+                        <div class="card-title">Dictionary</div>
+                        <div class="card-value">{{ word_count }}<span> words</span></div>
+                        <div class="card-desc">3-5 letter English words</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="card-title">DNA Space</div>
+                        <div class="card-value">256<span> seqs</span></div>
+                        <div class="card-desc">4-base sequences (4^4)</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="card-title">Algorithms</div>
+                        <div class="card-value">3</div>
+                        <div class="card-desc">A*, BFS, Dijkstra</div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="card-title">Heuristic</div>
+                        <div class="card-value" style="font-size:22px;">Hamming</div>
+                        <div class="card-desc">Admissible distance metric</div>
+                    </div>
+                </div>
+
+                <div class="action-grid">
+                    <button class="action-btn" onclick="switchView('solver')">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 2h6M8 2v5l-5 9h14l-5-9V2"/></svg>
+                        Solve Pathway
+                    </button>
+                    <button class="action-btn" onclick="switchView('compare')">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 4v12m0-12L2 7m3-3l3 3M15 16V4m0 12l-3-3m3 3l3-3"/></svg>
+                        Compare Algorithms
+                    </button>
+                    <button class="action-btn" onclick="switchView('visualizations')">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="10" width="4" height="8" rx="1"/><rect x="8" y="4" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="11" rx="1"/></svg>
+                        Visualizations
+                    </button>
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-panel-header">
+                        <div class="info-panel-icon">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17l5-5m0 0l4 4m-4-4V3m9 14l-5-5m0 0l-4 4m4-4V3"/></svg>
+                        </div>
+                        <div class="info-panel-title">How A* Search Works</div>
+                    </div>
+                    <div class="info-panel-desc">
+                        A* finds the shortest path by combining actual cost g(n) with a heuristic estimate h(n).
+                        For word ladders and DNA mutations, the Hamming distance counts differing characters,
+                        guiding the search toward the goal while guaranteeing optimality.
+                    </div>
+                    <div class="info-stats">
+                        <div class="info-stat">
+                            <div class="info-stat-label cyan">f(n) = g(n) + h(n)</div>
+                            <div class="info-stat-value">A*<span> search</span></div>
+                            <div class="info-bar cyan"></div>
+                        </div>
+                        <div class="info-stat">
+                            <div class="info-stat-label orange">Admissible</div>
+                            <div class="info-stat-value">h(n)<span> &le; actual</span></div>
+                            <div class="info-bar orange"></div>
+                        </div>
+                        <div class="info-stat">
+                            <div class="info-stat-label green">Optimal</div>
+                            <div class="info-stat-value">100<span>%</span></div>
+                            <div class="info-bar green"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== SOLVER ===== -->
+            <section id="view-solver" class="view">
+                <div class="view-label">Mutation Analysis</div>
+                <div class="view-title">Sequence Solver</div>
+
+                <div class="mode-toggle">
+                    <button class="mode-btn active" data-mode="word" onclick="setMode('word')">Word Ladder</button>
+                    <button class="mode-btn" data-mode="dna" onclick="setMode('dna')">DNA Mutation</button>
+                </div>
+
+                <div id="dna-opts" class="dna-options hidden">
+                    <div class="form-group">
+                        <label class="form-label">Sequence Length</label>
+                        <select id="seq-length" class="seq-select">
+                            <option value="4">4 bases (256 seqs)</option>
+                            <option value="5">5 bases (1,024 seqs)</option>
+                            <option value="6">6 bases (4,096 seqs)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" id="start-label">Start Word</label>
+                        <input type="text" id="start-input" class="form-input" placeholder="cold" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" id="goal-label">Goal Word</label>
+                        <input type="text" id="goal-input" class="form-input" placeholder="warm" autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+
+                <div class="algo-row">
+                    <div class="form-group">
+                        <label class="form-label">Algorithm</label>
+                        <div class="algo-selector">
+                            <button class="algo-btn active" data-algo="astar" onclick="setAlgo('astar')">A*</button>
+                            <button class="algo-btn" data-algo="bfs" onclick="setAlgo('bfs')">BFS</button>
+                            <button class="algo-btn" data-algo="dijkstra" onclick="setAlgo('dijkstra')">Dijkstra</button>
+                            <button class="algo-btn" data-algo="all" onclick="setAlgo('all')">All</button>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="solve-btn" onclick="solve()">
+                        Analyze Pathway
+                    </button>
+                </div>
+
+                <div class="results-section" id="results-section">
+                    <div class="results-divider"></div>
+                    <div id="results-container"></div>
+                    <div class="mt-24">
+                        <button class="btn-secondary" onclick="generateViz()">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="10" width="4" height="8" rx="1"/><rect x="8" y="4" width="4" height="14" rx="1"/><rect x="14" y="7" width="4" height="11" rx="1"/></svg>
+                            Generate Visualizations
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== VISUALIZATIONS ===== -->
+            <section id="view-visualizations" class="view">
+                <div class="view-label">Visual Analysis</div>
+                <div class="view-title">Visualizations</div>
+                <p style="color:var(--text-2);font-size:14px;margin-bottom:8px;">
+                    Use the Solver to generate visualizations, or click below to generate from the last solved pair.
+                </p>
+                <button class="btn-secondary mb-16" id="viz-gen-btn" onclick="generateViz()">
+                    <div class="spinner hidden" id="viz-spinner"></div>
+                    Generate All Visualizations
+                </button>
+                <div class="viz-grid" id="viz-grid">
+                    <div class="viz-card" onclick="openLightbox('search_graph')">
+                        <div id="viz-search_graph" class="viz-placeholder">Search Graph</div>
+                        <div class="viz-card-body">
+                            <div class="viz-card-title">Search Graph</div>
+                            <div class="viz-card-desc">Explored subgraph with optimal path highlighted</div>
+                        </div>
+                    </div>
+                    <div class="viz-card" onclick="openLightbox('comparison_chart')">
+                        <div id="viz-comparison_chart" class="viz-placeholder">Comparison Chart</div>
+                        <div class="viz-card-body">
+                            <div class="viz-card-title">Algorithm Comparison</div>
+                            <div class="viz-card-desc">Nodes explored per algorithm per word pair</div>
+                        </div>
+                    </div>
+                    <div class="viz-card" onclick="openLightbox('astar_steps')">
+                        <div id="viz-astar_steps" class="viz-placeholder">A* Steps</div>
+                        <div class="viz-card-body">
+                            <div class="viz-card-title">A* Step-by-Step</div>
+                            <div class="viz-card-desc">Expansion panels showing f/g/h values</div>
+                        </div>
+                    </div>
+                    <div class="viz-card" onclick="openLightbox('heuristic_accuracy')">
+                        <div id="viz-heuristic_accuracy" class="viz-placeholder">Heuristic Plot</div>
+                        <div class="viz-card-body">
+                            <div class="viz-card-title">Heuristic Accuracy</div>
+                            <div class="viz-card-desc">Hamming distance vs actual cost scatter plot</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== COMPARE ===== -->
+            <section id="view-compare" class="view">
+                <div class="view-label">Algorithm Comparison</div>
+                <div class="view-title">Performance Analysis</div>
+
+                <div class="mode-toggle">
+                    <button class="mode-btn active" data-mode="word" onclick="setCompareMode('word')">Word Ladder</button>
+                    <button class="mode-btn" data-mode="dna" onclick="setCompareMode('dna')">DNA Mutation</button>
+                </div>
+
+                <div class="form-label mb-16">Preset Pairs</div>
+                <div class="pairs-list" id="compare-pairs"></div>
+
+                <button class="btn-primary" id="compare-btn" onclick="runCompare()">
+                    Run Comparison
+                </button>
+
+                <div id="compare-results" class="hidden mt-24">
+                    <img id="compare-img" class="compare-img" src="" alt="Comparison chart" onclick="openLightboxSrc(this.src)">
+                    <table class="compare-table" id="compare-table">
+                        <thead><tr><th>Pair</th><th>Algorithm</th><th>Explored</th><th>Path Length</th><th>Path</th></tr></thead>
+                        <tbody id="compare-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+    <div class="lightbox-backdrop" onclick="closeLightbox()"></div>
+    <img class="lightbox-img" id="lightbox-img" src="" alt="Visualization">
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ========== STATE ========== */
+let state = {
+    mode: 'word',
+    algorithm: 'astar',
+    compareMode: 'word',
+    lastStart: '',
+    lastGoal: '',
+    vizImages: {},
+};
+
+const WORD_PAIRS = [['cold','warm'],['head','tail'],['hide','seek'],['lead','gold'],['work','play']];
+const DNA_PAIRS  = [['ATCG','GCTA'],['AAAA','TTTT'],['ATCG','TAGC'],['AATT','GGCC'],['ACGT','TGCA']];
+
+/* ========== VIEW SWITCHING ========== */
+function switchView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+    // update topbar tabs
+    const tabs = document.querySelectorAll('.topbar-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    if (name === 'solver' || name === 'dashboard') tabs[0].classList.add('active');
+    else if (name === 'visualizations') tabs[1].classList.add('active');
+    else if (name === 'compare') tabs[2].classList.add('active');
+}
+
+function newAnalysis() {
+    switchView('solver');
+    document.getElementById('results-section').classList.remove('show');
+    document.getElementById('start-input').value = '';
+    document.getElementById('goal-input').value = '';
+    document.getElementById('start-input').focus();
+}
+
+/* ========== MODE / ALGO ========== */
+function setMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll('#view-solver .mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const dnaOpts = document.getElementById('dna-opts');
+    const startInput = document.getElementById('start-input');
+    const goalInput = document.getElementById('goal-input');
+    if (mode === 'dna') {
+        dnaOpts.classList.remove('hidden');
+        startInput.placeholder = 'ATCG';
+        goalInput.placeholder = 'GCTA';
+        startInput.classList.add('dna-input');
+        goalInput.classList.add('dna-input');
+        document.getElementById('start-label').textContent = 'Start Sequence';
+        document.getElementById('goal-label').textContent = 'Goal Sequence';
+    } else {
+        dnaOpts.classList.add('hidden');
+        startInput.placeholder = 'cold';
+        goalInput.placeholder = 'warm';
+        startInput.classList.remove('dna-input');
+        goalInput.classList.remove('dna-input');
+        document.getElementById('start-label').textContent = 'Start Word';
+        document.getElementById('goal-label').textContent = 'Goal Word';
+    }
+}
+
+function setAlgo(algo) {
+    state.algorithm = algo;
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.toggle('active', b.dataset.algo === algo));
+}
+
+function setCompareMode(mode) {
+    state.compareMode = mode;
+    document.querySelectorAll('#view-compare .mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    renderComparePairs();
+}
+
+function renderComparePairs() {
+    const pairs = state.compareMode === 'dna' ? DNA_PAIRS : WORD_PAIRS;
+    document.getElementById('compare-pairs').innerHTML = pairs.map(([s,g]) =>
+        `<span class="pair-badge">${s} &rarr; ${g}</span>`
+    ).join('');
+}
+
+/* ========== API CALLS ========== */
+async function solve() {
+    const start = document.getElementById('start-input').value.trim();
+    const goal = document.getElementById('goal-input').value.trim();
+    if (!start || !goal) { toast('Enter both start and goal.', 'error'); return; }
+
+    const btn = document.getElementById('solve-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+
+    try {
+        const resp = await fetch('/api/solve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: state.mode,
+                start, goal,
+                algorithm: state.algorithm,
+                seq_length: document.getElementById('seq-length').value,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { toast(data.error, 'error'); return; }
+
+        state.lastStart = start;
+        state.lastGoal = goal;
+        renderResults(data);
+        toast('Analysis complete!', 'success');
+    } catch(e) {
+        toast('Network error. Is the server running?', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Analyze Pathway';
+    }
+}
+
+async function generateViz() {
+    if (!state.lastStart || !state.lastGoal) { toast('Solve a pathway first.', 'error'); return; }
+
+    const spinner = document.getElementById('viz-spinner');
+    const btn = document.getElementById('viz-gen-btn');
+    if (spinner) spinner.classList.remove('hidden');
+    if (btn) btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/visualize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: state.mode,
+                start: state.lastStart,
+                goal: state.lastGoal,
+                seq_length: document.getElementById('seq-length').value,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { toast(data.error, 'error'); return; }
+
+        state.vizImages = data.images;
+        Object.entries(data.images).forEach(([key, url]) => {
+            const el = document.getElementById('viz-' + key);
+            if (el) {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = key;
+                img.className = 'viz-card-img';
+                el.replaceWith(img);
+                img.id = 'viz-' + key;
+            }
+        });
+        switchView('visualizations');
+        toast('Visualizations generated!', 'success');
+    } catch(e) {
+        toast('Error generating visualizations.', 'error');
+    } finally {
+        if (spinner) spinner.classList.add('hidden');
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function runCompare() {
+    const btn = document.getElementById('compare-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Running...';
+
+    try {
+        const resp = await fetch('/api/compare', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                mode: state.compareMode,
+                seq_length: document.getElementById('seq-length').value,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { toast(data.error, 'error'); return; }
+
+        document.getElementById('compare-img').src = data.image;
+        const tbody = document.getElementById('compare-tbody');
+        tbody.innerHTML = data.results.map(r => `
+            <tr>
+                <td>${r.pair}</td>
+                <td><span class="tag tag-${r.algorithm.toLowerCase().replace('*','star')}">${r.algorithm}</span></td>
+                <td>${r.nodes_explored}</td>
+                <td>${r.path_length}</td>
+                <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.path}">${r.path}</td>
+            </tr>
+        `).join('');
+        document.getElementById('compare-results').classList.remove('hidden');
+        toast('Comparison complete!', 'success');
+    } catch(e) {
+        toast('Error running comparison.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Run Comparison';
+    }
+}
+
+/* ========== RENDER ========== */
+function renderResults(data) {
+    const container = document.getElementById('results-container');
+    const mode = data.mode;
+    container.innerHTML = data.results.map(r => {
+        const algoClass = r.algorithm.toLowerCase().replace('*','star');
+        const pathHtml = r.path
+            ? renderPath(r.path, mode)
+            : '<div class="no-path">No path found!</div>';
+        return `
+            <div class="result-block">
+                <div class="result-algo">
+                    <span class="tag tag-${algoClass}">${r.algorithm}</span>
+                    Algorithm
+                </div>
+                <div class="path-chain">${pathHtml}</div>
+                <div class="result-stats">
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Path Length</div>
+                        <div class="mini-stat-value">${r.path_length}<span> steps</span></div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Nodes Explored</div>
+                        <div class="mini-stat-value">${r.nodes_explored}</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Time</div>
+                        <div class="mini-stat-value">${r.execution_time}<span>s</span></div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-label">Graph Size</div>
+                        <div class="mini-stat-value">${data.graph_size}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    document.getElementById('results-section').classList.add('show');
+}
+
+function renderPath(path, mode) {
+    return path.map((word, i) => {
+        const cls = i === 0 ? 'start' : i === path.length - 1 ? 'goal' : 'mid';
+        const inner = mode === 'dna' ? colorDNA(word) : escHtml(word);
+        const arrow = i < path.length - 1 ? '<span class="path-arrow">&rarr;</span>' : '';
+        return `<span class="path-node ${cls}">${inner}</span>${arrow}`;
+    }).join('');
+}
+
+function colorDNA(seq) {
+    return seq.split('').map(b => {
+        const cls = {A:'base-a',T:'base-t',G:'base-g',C:'base-c'}[b] || '';
+        return `<span class="${cls}">${b}</span>`;
+    }).join('');
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+/* ========== LIGHTBOX ========== */
+function openLightbox(key) {
+    const img = document.getElementById('viz-' + key);
+    if (!img || !img.src) return;
+    document.getElementById('lightbox-img').src = img.src;
+    document.getElementById('lightbox').classList.add('open');
+}
+function openLightboxSrc(src) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+/* ========== TOAST ========== */
+function toast(msg, type='error') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+/* ========== INIT ========== */
+renderComparePairs();
+
+// Allow Enter to solve
+document.getElementById('goal-input').addEventListener('keydown', e => { if (e.key === 'Enter') solve(); });
+document.getElementById('start-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('goal-input').focus(); });
+</script>
+</body>
+</html>
