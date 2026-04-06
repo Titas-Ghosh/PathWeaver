@@ -21,18 +21,27 @@ DEFAULT_WORD_PAIRS = [
     ("work", "play"),
 ]
 
+DNA_WORD_PAIRS = [
+    ("ATCG", "GCTA"),
+    ("AAAA", "TTTT"),
+    ("ATCG", "TAGC"),
+    ("AATT", "GGCC"),
+    ("ACGT", "TGCA"),
+]
+
 
 def plot_comparison(
     graph: WordGraph,
     word_pairs: list[tuple[str, str]] | None = None,
     output_path: str = "output/comparison_chart.png",
+    mode: str = "word",
 ) -> list[dict]:
-    """Run A*, BFS, and Dijkstra on multiple word pairs and generate a grouped bar chart.
+    """Run A*, BFS, and Dijkstra on multiple pairs and generate a grouped bar chart.
 
     Returns a list of result dicts for printing.
     """
     if word_pairs is None:
-        word_pairs = DEFAULT_WORD_PAIRS
+        word_pairs = DNA_WORD_PAIRS if mode == "dna" else DEFAULT_WORD_PAIRS
 
     sns.set_theme(style="whitegrid")
 
@@ -43,7 +52,7 @@ def plot_comparison(
     ]
     colors = ["#4CAF50", "#2196F3", "#FF9800"]
 
-    labels = [f"{s}→{g}" for s, g in word_pairs]
+    labels = [f"{s}\u2192{g}" for s, g in word_pairs]
     results_table: list[dict] = []
     data: dict[str, list[int]] = {name: [] for name, _ in algorithms}
 
@@ -62,7 +71,7 @@ def plot_comparison(
     # Plot grouped bar chart
     x = np.arange(len(labels))
     width = 0.25
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(14 if mode == "dna" else 12, 6))
 
     for i, (algo_name, _) in enumerate(algorithms):
         bars = ax.bar(
@@ -79,14 +88,16 @@ def plot_comparison(
                 ha="center", va="bottom", fontsize=8, fontweight="bold",
             )
 
-    ax.set_xlabel("Word Pair", fontsize=12, fontweight="bold")
+    x_label = "DNA Sequence Pair" if mode == "dna" else "Word Pair"
+    title = ("DNA Mutation Pathway \u2014 Algorithm Comparison"
+             if mode == "dna"
+             else "Algorithm Comparison \u2014 Nodes Explored per Word Pair")
+
+    ax.set_xlabel(x_label, fontsize=12, fontweight="bold")
     ax.set_ylabel("Nodes Explored", fontsize=12, fontweight="bold")
-    ax.set_title(
-        "Algorithm Comparison — Nodes Explored per Word Pair",
-        fontsize=14, fontweight="bold", pad=15,
-    )
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=15)
     ax.set_xticks(x + width)
-    ax.set_xticklabels(labels, fontsize=10)
+    ax.set_xticklabels(labels, fontsize=9 if mode == "dna" else 10)
     ax.legend(fontsize=11, frameon=True, fancybox=True, shadow=True)
     ax.set_ylim(bottom=0)
 

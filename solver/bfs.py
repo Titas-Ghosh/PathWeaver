@@ -13,7 +13,7 @@ def bfs(graph: WordGraph, start: str, goal: str) -> SearchResult:
     BFS guarantees the shortest path in an unweighted graph since it
     explores nodes level by level.
     """
-    start, goal = start.lower(), goal.lower()
+    start, goal = start.strip(), goal.strip()
     t0 = time.perf_counter()
 
     # Edge case: same word

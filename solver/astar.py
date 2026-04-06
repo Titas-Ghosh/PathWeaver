@@ -20,7 +20,7 @@ def astar(graph: WordGraph, start: str, goal: str) -> SearchResult:
     This implementation captures a full expansion history for step-by-step
     visualization of the algorithm's progress.
     """
-    start, goal = start.lower(), goal.lower()
+    start, goal = start.strip(), goal.strip()
     t0 = time.perf_counter()
 
     if start == goal:

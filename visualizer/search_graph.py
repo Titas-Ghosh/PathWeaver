@@ -9,11 +9,20 @@ import seaborn as sns
 from solver import SearchResult
 from solver.graph import WordGraph
 
+# Nucleotide colors for DNA mode (based on first base)
+_NUC_COLORS = {"A": "#00BCD4", "T": "#E91E63", "G": "#4CAF50", "C": "#FF9800"}
+
+
+def _dna_node_color(seq: str) -> str:
+    """Return a color based on the first nucleotide of a DNA sequence."""
+    return _NUC_COLORS.get(seq[0], "#E0E0E0")
+
 
 def plot_search_graph(
     result: SearchResult,
     graph: WordGraph,
     output_path: str = "output/search_graph.png",
+    mode: str = "word",
 ) -> None:
     """Render the subgraph of all explored nodes, highlighting the optimal path.
 
@@ -22,10 +31,10 @@ def plot_search_graph(
         - Red: goal node
         - Green: optimal path nodes (excluding start/goal)
         - Orange: frontier / open set nodes (A* only)
-        - Light gray: other explored nodes
+        - Light gray (word) or nucleotide-colored (DNA): other explored nodes
     """
     if result.path is None:
-        print("No path found — skipping search graph visualization.")
+        print("No path found -- skipping search graph visualization.")
         return
 
     sns.set_theme(style="whitegrid")
@@ -36,7 +45,6 @@ def plot_search_graph(
         explored_nodes = set(last_step["closed_set"])
         frontier_nodes = set(last_step["open_set"])
     else:
-        # For BFS/Dijkstra, approximate from the path and neighbors
         explored_nodes = set()
         for word in result.path:
             explored_nodes.add(word)
@@ -78,7 +86,11 @@ def plot_search_graph(
             node_colors.append("#FF9800")  # Orange
             node_sizes.append(350)
         else:
-            node_colors.append("#E0E0E0")  # Light gray
+            # DNA mode: color by first nucleotide; word mode: light gray
+            if mode == "dna":
+                node_colors.append(_dna_node_color(node))
+            else:
+                node_colors.append("#E0E0E0")
             node_sizes.append(350)
 
     # Draw regular edges (light)
@@ -98,12 +110,14 @@ def plot_search_graph(
     )
 
     # Labels
+    font_size = 6 if mode == "dna" else 7
     nx.draw_networkx_labels(
-        G, pos, font_size=7, font_weight="bold", font_color="#212121", ax=ax,
+        G, pos, font_size=font_size, font_weight="bold", font_color="#212121", ax=ax,
     )
 
+    title_prefix = "A* DNA Mutation Search" if mode == "dna" else "A* Search Graph"
     ax.set_title(
-        f"A* Search Graph:  {start} → {goal}   |   "
+        f"{title_prefix}:  {start} \u2192 {goal}   |   "
         f"Path length: {result.path_length}   |   "
         f"Nodes explored: {result.nodes_explored}",
         fontsize=14, fontweight="bold", pad=20,
@@ -121,9 +135,18 @@ def plot_search_graph(
                markersize=12, label="Optimal path"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="#FF9800",
                markersize=12, label="Frontier (open set)"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="#E0E0E0",
-               markersize=12, label="Explored"),
     ]
+    if mode == "dna":
+        for base, color in _NUC_COLORS.items():
+            legend_elements.append(
+                Line2D([0], [0], marker="o", color="w", markerfacecolor=color,
+                       markersize=10, label=f"Base {base}"),
+            )
+    else:
+        legend_elements.append(
+            Line2D([0], [0], marker="o", color="w", markerfacecolor="#E0E0E0",
+                   markersize=12, label="Explored"),
+        )
     ax.legend(handles=legend_elements, loc="lower left", fontsize=10,
               frameon=True, fancybox=True, shadow=True)
 

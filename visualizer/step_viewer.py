@@ -10,12 +10,16 @@ import seaborn as sns
 from solver import SearchResult
 from solver.graph import WordGraph
 
+# Nucleotide colors for DNA mode
+_NUC_COLORS = {"A": "#00BCD4", "T": "#E91E63", "G": "#4CAF50", "C": "#FF9800"}
+
 
 def plot_step_viewer(
     result: SearchResult,
     graph: WordGraph,
     output_path: str = "output/astar_steps.png",
     max_steps: int = 6,
+    mode: str = "word",
 ) -> None:
     """Generate a multi-panel figure showing A* expanding step by step.
 
@@ -23,7 +27,7 @@ def plot_step_viewer(
     and the f/g/h values for the current node.
     """
     if not result.expansion_history:
-        print("No expansion history available — skipping step viewer.")
+        print("No expansion history available -- skipping step viewer.")
         return
 
     sns.set_theme(style="whitegrid")
@@ -88,7 +92,7 @@ def plot_step_viewer(
         node_sizes = []
         for node in G_step.nodes():
             if node == current:
-                node_colors.append("#F44336")  # Red — currently expanding
+                node_colors.append("#F44336")  # Red -- currently expanding
                 node_sizes.append(650)
             elif node == start:
                 node_colors.append("#2196F3")  # Blue
@@ -97,10 +101,16 @@ def plot_step_viewer(
                 node_colors.append("#9C27B0")  # Purple
                 node_sizes.append(550)
             elif node in open_set:
-                node_colors.append("#FF9800")  # Orange — frontier
+                if mode == "dna":
+                    node_colors.append(_NUC_COLORS.get(node[0], "#FF9800"))
+                else:
+                    node_colors.append("#FF9800")  # Orange -- frontier
                 node_sizes.append(400)
             elif node in closed:
-                node_colors.append("#B0BEC5")  # Gray — explored
+                if mode == "dna":
+                    node_colors.append(_NUC_COLORS.get(node[0], "#B0BEC5"))
+                else:
+                    node_colors.append("#B0BEC5")  # Gray -- explored
                 node_sizes.append(400)
             else:
                 node_colors.append("#ECEFF1")
@@ -114,7 +124,8 @@ def plot_step_viewer(
         nx.draw_networkx_nodes(G_step, step_pos, node_color=node_colors,
                                node_size=node_sizes, edgecolors="#424242",
                                linewidths=0.7, ax=ax)
-        nx.draw_networkx_labels(G_step, step_pos, font_size=6,
+        font_size = 5 if mode == "dna" else 6
+        nx.draw_networkx_labels(G_step, step_pos, font_size=font_size,
                                 font_weight="bold", ax=ax)
 
         ax.set_title(
@@ -130,8 +141,9 @@ def plot_step_viewer(
         axes[idx].axis("off")
         axes[idx].set_visible(False)
 
+    title_prefix = "A* DNA Mutation \u2014 Step-by-Step" if mode == "dna" else "A* Step-by-Step Expansion"
     fig.suptitle(
-        f"A* Step-by-Step Expansion:  {start} → {goal}",
+        f"{title_prefix}:  {start} \u2192 {goal}",
         fontsize=16, fontweight="bold", y=1.02,
     )
     fig.tight_layout()

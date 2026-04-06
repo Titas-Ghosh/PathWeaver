@@ -13,7 +13,7 @@ def dijkstra(graph: WordGraph, start: str, goal: str) -> SearchResult:
     All edges have uniform cost of 1, so this behaves similarly to BFS
     but uses a priority queue. Included for algorithm comparison.
     """
-    start, goal = start.lower(), goal.lower()
+    start, goal = start.strip(), goal.strip()
     t0 = time.perf_counter()
 
     if start == goal:
