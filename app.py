@@ -13,6 +13,9 @@ from solver.astar import astar
 from solver.bfs import bfs
 from solver.dijkstra import dijkstra
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join("/tmp", "output") if os.environ.get("VERCEL") else os.path.join(BASE_DIR, "output")
+
 app = Flask(__name__)
 
 _word_graph = None
@@ -28,7 +31,7 @@ ALGORITHMS = {
 def get_word_graph() -> WordGraph:
     global _word_graph
     if _word_graph is None:
-        _word_graph = WordGraph("data/dictionary.txt")
+        _word_graph = WordGraph(os.path.join(BASE_DIR, "data", "dictionary.txt"))
     return _word_graph
 
 
@@ -114,12 +117,13 @@ def api_visualize():
     from visualizer.comparison import plot_comparison
 
     prefix = "dna_" if mode == "dna" else ""
-    os.makedirs("output", exist_ok=True)
+    out_dir = os.path.join(OUTPUT_DIR, "")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    plot_search_graph(result, graph, f"output/{prefix}search_graph.png", mode=mode)
-    plot_step_viewer(result, graph, f"output/{prefix}astar_steps.png", mode=mode)
-    plot_heuristic_accuracy(goal, graph, f"output/{prefix}heuristic_accuracy.png", mode=mode)
-    plot_comparison(graph, output_path=f"output/{prefix}comparison_chart.png", mode=mode)
+    plot_search_graph(result, graph, f"{out_dir}{prefix}search_graph.png", mode=mode)
+    plot_step_viewer(result, graph, f"{out_dir}{prefix}astar_steps.png", mode=mode)
+    plot_heuristic_accuracy(goal, graph, f"{out_dir}{prefix}heuristic_accuracy.png", mode=mode)
+    plot_comparison(graph, output_path=f"{out_dir}{prefix}comparison_chart.png", mode=mode)
 
     t = int(time.time())
     return jsonify({"images": {
@@ -141,11 +145,11 @@ def api_compare():
 
     prefix = "dna_" if mode == "dna" else ""
     pairs = DNA_WORD_PAIRS if mode == "dna" else DEFAULT_WORD_PAIRS
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     results = plot_comparison(
         graph, word_pairs=pairs,
-        output_path=f"output/{prefix}comparison_chart.png", mode=mode,
+        output_path=os.path.join(OUTPUT_DIR, f"{prefix}comparison_chart.png"), mode=mode,
     )
 
     t = int(time.time())
@@ -212,7 +216,7 @@ def api_graph_data():
 
 @app.route("/output/<path:filename>")
 def serve_output(filename):
-    return send_from_directory("output", filename)
+    return send_from_directory(OUTPUT_DIR, filename)
 
 
 if __name__ == "__main__":
