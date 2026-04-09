@@ -49,6 +49,61 @@ def _norm(text, mode):
     return text.strip().upper() if mode == "dna" else text.strip().lower()
 
 
+def _compute_layout(nodes, edges):
+    """Compute node positions. Try networkx kamada_kawai, fall back to spring layout."""
+    try:
+        import networkx as nx
+        G = nx.Graph()
+        G.add_nodes_from(nodes)
+        G.add_edges_from(edges)
+        pos = nx.kamada_kawai_layout(G)
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+    except Exception:
+        import math, random
+        random.seed(42)
+        # Simple force-directed spring layout
+        pos = {n: [random.uniform(-1, 1), random.uniform(-1, 1)] for n in nodes}
+        adj = {n: set() for n in nodes}
+        for a, b in edges:
+            adj[a].add(b)
+            adj[b].add(a)
+        for _ in range(200):
+            disp = {n: [0.0, 0.0] for n in nodes}
+            for i, u in enumerate(nodes):
+                for v in nodes[i + 1:]:
+                    dx = pos[u][0] - pos[v][0]
+                    dy = pos[u][1] - pos[v][1]
+                    d = max(math.sqrt(dx * dx + dy * dy), 0.01)
+                    f = 0.5 / (d * d)
+                    disp[u][0] += dx * f
+                    disp[u][1] += dy * f
+                    disp[v][0] -= dx * f
+                    disp[v][1] -= dy * f
+            for a, b in edges:
+                dx = pos[a][0] - pos[b][0]
+                dy = pos[a][1] - pos[b][1]
+                d = max(math.sqrt(dx * dx + dy * dy), 0.01)
+                f = d * 0.1
+                disp[a][0] -= dx * f
+                disp[a][1] -= dy * f
+                disp[b][0] += dx * f
+                disp[b][1] += dy * f
+            for n in nodes:
+                d = max(math.sqrt(disp[n][0] ** 2 + disp[n][1] ** 2), 0.01)
+                t = min(d, 0.1)
+                pos[n][0] += disp[n][0] / d * t
+                pos[n][1] += disp[n][1] / d * t
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+    # Normalize to 0-1
+    rx = max(xs) - min(xs) or 1
+    ry = max(ys) - min(ys) or 1
+    mx, my = min(xs), min(ys)
+    return {n: [round((pos[n][0] - mx) / rx, 4), round((pos[n][1] - my) / ry, 4)]
+            for n in nodes}
+
+
 @app.route("/")
 def index():
     wg = get_word_graph()
@@ -188,21 +243,8 @@ def api_graph_data():
             if neighbor in all_nodes:
                 edge_set.add(tuple(sorted([node, neighbor])))
 
-    # Compute layout with networkx
-    import networkx as nx
-    G = nx.Graph()
-    G.add_nodes_from(all_nodes)
-    G.add_edges_from(edge_set)
-    pos = nx.kamada_kawai_layout(G)
-
-    # Normalize positions to 0-1
-    xs = [p[0] for p in pos.values()]
-    ys = [p[1] for p in pos.values()]
-    rx = max(xs) - min(xs) or 1
-    ry = max(ys) - min(ys) or 1
-    mx, my = min(xs), min(ys)
-    positions = {n: [round((p[0] - mx) / rx, 4), round((p[1] - my) / ry, 4)]
-                 for n, p in pos.items()}
+    # Compute layout — try networkx first, fall back to simple spring layout
+    positions = _compute_layout(list(all_nodes), list(edge_set))
 
     return jsonify({
         "positions": positions,
